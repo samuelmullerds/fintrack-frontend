@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'services/auth_service.dart';
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
@@ -54,6 +54,7 @@ class LoginScreen extends StatelessWidget {
               children: [
 
                 TextField(
+                  controller: emailController,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: "Digite seu email",
@@ -71,6 +72,7 @@ class LoginScreen extends StatelessWidget {
                 const SizedBox(height: 20),
 
                 TextField(
+                  controller: passwordController,
                   obscureText: true,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
@@ -98,7 +100,19 @@ class LoginScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(30),
                       ),
                     ),
-                    onPressed: () {},
+                    onPressed: () async {
+                      final authService = AuthService();
+                      final user = await authService.login(
+                        emailController.text,
+                        passwordController.text,
+                      );
+
+                      if (user != null) {
+                        print("Login sucesso: ${user['token']}");
+                      } else {
+                        print("Erro no login");
+                      }
+                    },
                     child: const Text("Entrar"),
                   ),
                 ),
