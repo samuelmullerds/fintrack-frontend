@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'login_screen.dart';
 void main() {
   runApp(const FinTrackApp());
 }
+
 
 class FinTrackApp extends StatelessWidget {
   const FinTrackApp({super.key});
@@ -31,40 +33,40 @@ class WelcomeScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 30.0),
           child: Column(
             children: [
-              // --- 1. Topo: Logo ---
-              const SizedBox(height: 40), // Um pequeno respiro no topo
+              
+              const SizedBox(height: 40),
               Image.asset(
                 "assets/images/logo.png",
-                width: 500, // MANTIDO O TAMANHO GRANDE
+                width: 500, 
                 fit: BoxFit.contain,
               ),
 
-              // --- 2. ESPAÇO FLEXÍVEL SUPERIOR (MENOR) ---
-              // Usamos um flex menor (ex: 2) para deixar o texto mais próximo da logo
+
               const Spacer(flex: 2), 
 
-              // --- 3. SEJA BEM VINDO (NO CENTRO PERCEBIDO) ---
               const Text(
                 'Seja Bem Vindo',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: primaryGreen,
-                  fontSize: 40, // Mantido o tamanho grande e imponente
+                  fontSize: 40, 
                   fontWeight: FontWeight.bold,
                 ),
               ),
 
-              // --- 4. ESPAÇO FLEXÍVEL INFERIOR (MAIOR) ---
-              // Usamos um flex maior (ex: 3) para empurrar o texto para cima,
-              // fazendo-o parecer centralizado no bloco de conteúdo.
+
               const Spacer(flex: 3), 
 
-              // --- 5. BOTÃO ENTRAR ---
               SizedBox(
                 width: double.infinity,
                 height: 60,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryGreen,
                     elevation: 12,
@@ -86,7 +88,7 @@ class WelcomeScreen extends StatelessWidget {
 
               const SizedBox(height: 25),
 
-              // --- 6. RODAPÉ (CADASTRE-SE) ---
+   
               Column(
                 children: [
                   const Text(
@@ -120,4 +122,4 @@ class WelcomeScreen extends StatelessWidget {
       ),
     );
   }
-}
+} 
