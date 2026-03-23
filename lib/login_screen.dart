@@ -1,12 +1,24 @@
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
-class LoginScreen extends StatelessWidget {
+import 'home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
+
+    String? errorMessage;
+  
+  @override
+  Widget build(BuildContext context) {
+
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -102,15 +114,24 @@ class LoginScreen extends StatelessWidget {
                     ),
                     onPressed: () async {
                       final authService = AuthService();
-                      final user = await authService.login(
+
+                      final result = await authService.login(
                         emailController.text,
                         passwordController.text,
                       );
 
-                      if (user != null) {
-                        print("Login sucesso: ${user['token']}");
+                      if (result != null) {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setString('token', result['token']);
+
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const HomeScreen()),
+                        );
                       } else {
-                        print("Erro no login");
+                        setState(() {
+                          errorMessage = "Email ou senha inválidos";
+                        });
                       }
                     },
                     child: const Text("Entrar"),
@@ -145,6 +166,14 @@ class LoginScreen extends StatelessWidget {
                       color: Colors.green,
                       decoration: TextDecoration.underline,
                     ),
+                  ),
+                ),
+                if (errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    errorMessage!,
+                    style: const TextStyle(color: Colors.red),
                   ),
                 ),
               ],
