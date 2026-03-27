@@ -20,71 +20,77 @@ class _HomeScreenState extends State<HomeScreen> {
   static const Color cardBg = Color(0xFF1A1A1A);
 
   int _currentIndex = 0;
-  String name = "";
-  bool isLoading = true;
-  double saldo = 0;
-  double entradas = 0;
-  double saidas = 0;
-  List<Map<String, dynamic>> ultimasMovimentacoes = [];
+  String _name = "";
+  String _email = "";
+  bool _isLoading = true;
+
+  double _balance = 0;
+  double _income = 0;
+  double _expense = 0;
+
+  List<Map<String, dynamic>> _recent = [];
   List<Map<String, dynamic>> _pieData = [];
+
+  static const _catColors = [
+    Color(0xFF1DB954), // verde spotify
+    Color(0xFF2196F3), // azul
+    Color(0xFFFF5722), // laranja-vermelho
+    Color(0xFFFFEB3B), // amarelo
+    Color(0xFFE91E63), // rosa
+    Color(0xFF9C27B0), // roxo
+    Color(0xFF00BCD4), // ciano
+    Color(0xFFFF9800), // laranja
+    Color(0xFF8BC34A), // verde-limão
+    Color(0xFF795548), // marrom
+  ];
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadAll();
   }
 
-  Future<void> _loadData() async {
-    final authService = AuthService();
-    final transactionService = TransactionService();
-    final user = await authService.getUser();
+  Future<void> _loadAll() async {
+    setState(() => _isLoading = true);
 
-    if (user != null) {
-      final transactions = await transactionService.getTransactions();
-      double totalEntradas = 0, totalSaidas = 0;
-      final Map<String, double> categoryMap = {};
+    final auth = AuthService();
+    final ts = TransactionService();
 
-      for (var t in transactions) {
-        final valor = (t['value'] as num).toDouble();
-        if (t['type'] == 'INCOME') {
-          totalEntradas += valor;
-        } else {
-          totalSaidas += valor;
-          final cat = t['category'] ?? 'Outros';
-          categoryMap[cat] = (categoryMap[cat] ?? 0) + valor;
-        }
-      }
+    final results = await Future.wait([
+      auth.getUser(),
+      ts.getDashboard(),
+      ts.getTransactions(size: 4),
+      ts.getCategorySummary(),
+    ]);
 
-      // Monta dados do gráfico de pizza
-      final colors = [
-        primaryGreen,
-        const Color(0xFF4CAF50),
-        const Color(0xFF2196F3),
-        const Color(0xFFFFEB3B),
-        Colors.grey,
-      ];
-      final sorted = categoryMap.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
-      final total = categoryMap.values.fold(0.0, (a, b) => a + b);
+    final user = results[0] as Map<String, dynamic>?;
+    final dashboard = results[1] as Map<String, dynamic>?;
+    final recent = results[2] as List<Map<String, dynamic>>;
+    final cats = results[3] as List<Map<String, dynamic>>;
 
-      if (!mounted) return;
-      setState(() {
-        name = user['name'] ?? "";
-        entradas = totalEntradas;
-        saidas = totalSaidas;
-        saldo = totalEntradas - totalSaidas;
-        ultimasMovimentacoes = transactions.take(4).toList();
-        _pieData = sorted.asMap().entries.map((e) => {
-          'label': e.value.key,
-          'value': e.value.value,
-          'percent': total > 0 ? (e.value.value / total * 100).round() : 0,
-          'color': colors[e.key % colors.length],
+    final totalCat =
+        cats.fold(0.0, (s, c) => s + (c['total'] as num).toDouble());
+    final pie = cats.asMap().entries.map((e) => {
+          'label': e.value['category'] as String,
+          'value': (e.value['total'] as num).toDouble(),
+          'percent': totalCat > 0
+              ? ((e.value['total'] as num).toDouble() / totalCat * 100).round()
+              : 0,
+          // Garante cor única por índice com paleta de 10 cores
+          'color': _catColors[e.key % _catColors.length],
         }).toList();
-        isLoading = false;
-      });
-    } else {
-      setState(() => isLoading = false);
-    }
+
+    if (!mounted) return;
+    setState(() {
+      _name = user?['name'] ?? '';
+      _email = user?['email'] ?? '';
+      _balance = (dashboard?['balance'] as num?)?.toDouble() ?? 0;
+      _income = (dashboard?['income'] as num?)?.toDouble() ?? 0;
+      _expense = (dashboard?['expense'] as num?)?.toDouble() ?? 0;
+      _recent = recent;
+      _pieData = pie;
+      _isLoading = false;
+    });
   }
 
   Future<void> _logout() async {
@@ -92,102 +98,209 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.remove('token');
     if (!mounted) return;
     Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+        context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+  }
+
+  void _showProfileModal() {
+    final firstName = _name.split(' ').first;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 24),
+
+            CircleAvatar(
+              radius: 36,
+              backgroundColor: primaryGreen,
+              child: Text(
+                firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 30),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            Text(
+              _name,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+
+            Text(
+              _email,
+              style: const TextStyle(color: Colors.white54, fontSize: 14),
+            ),
+            const SizedBox(height: 24),
+
+            const Divider(color: Colors.white12),
+            const SizedBox(height: 8),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _profileStat('Saldo', _fmt(_balance), Colors.white),
+                _profileStat('Entradas', _fmt(_income), primaryGreen),
+                _profileStat('Saídas', _fmt(_expense), Colors.red),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+            const Divider(color: Colors.white12),
+            const SizedBox(height: 8),
+
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Sair da conta',
+                  style: TextStyle(color: Colors.red, fontSize: 15)),
+              onTap: () {
+                Navigator.pop(context);
+                _logout();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 
-  String _formatCurrency(double value) {
-    final formatted = value.abs().toStringAsFixed(2).replaceAll('.', ',');
-    final parts = formatted.split(',');
+  Widget _profileStat(String label, String value, Color valueColor) {
+    return Column(
+      children: [
+        Text(value,
+            style: TextStyle(
+                color: valueColor,
+                fontSize: 14,
+                fontWeight: FontWeight.bold)),
+        const SizedBox(height: 2),
+        Text(label,
+            style: const TextStyle(color: Colors.white54, fontSize: 12)),
+      ],
+    );
+  }
+
+  String _fmt(double v) {
+    final s = v.abs().toStringAsFixed(2).replaceAll('.', ',');
+    final parts = s.split(',');
     final intPart = parts[0].replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
     return 'R\$ $intPart,${parts[1]}';
   }
 
-  IconData _categoryIcon(String? category) {
-    switch (category?.toLowerCase()) {
-      case 'mercado':
-      case 'alimentação': return Icons.shopping_cart_outlined;
-      case 'mecânico':
-      case 'transporte': return Icons.build_outlined;
-      case 'internet':
-      case 'contas fixas': return Icons.wifi;
-      case 'lazer': return Icons.sports_esports_outlined;
-      default: return Icons.attach_money;
+  IconData _icon(String? cat) {
+    switch ((cat ?? '').toLowerCase()) {
+      case 'alimentação':
+        return Icons.shopping_cart_outlined;
+      case 'transporte':
+        return Icons.directions_car_outlined;
+      case 'contas fixas':
+        return Icons.wifi;
+      case 'lazer':
+        return Icons.sports_esports_outlined;
+      case 'saúde':
+        return Icons.favorite_outline;
+      case 'educação':
+        return Icons.school_outlined;
+      default:
+        return Icons.attach_money;
     }
   }
 
-  Widget _buildPieChart() {
+  Widget _buildPie() {
     if (_pieData.isEmpty) {
       return const Center(
-        child: Text("Sem gastos registrados", style: TextStyle(color: Colors.white54)),
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('Sem gastos registrados',
+              style: TextStyle(color: Colors.white54)),
+        ),
       );
     }
-
     return Row(
       children: [
-        // Legenda
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: _pieData.map((s) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                children: [
-                  Container(
-                    width: 10, height: 10,
-                    decoration: BoxDecoration(color: s['color'], shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      "${s['label']} ${s['percent']}%",
-                      style: const TextStyle(color: Colors.white70, fontSize: 11),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            )).toList(),
+            children: _pieData
+                .map((s) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(children: [
+                        Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                                color: s['color'] as Color,
+                                shape: BoxShape.circle)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${s['label']} ${s['percent']}%',
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ]),
+                    ))
+                .toList(),
           ),
         ),
-        // Pizza
         SizedBox(
           width: 110,
           height: 110,
-          child: PieChart(
-            PieChartData(
-              sectionsSpace: 2,
-              centerSpaceRadius: 0,
-              sections: _pieData.map((s) => PieChartSectionData(
-                color: s['color'],
-                value: (s['value'] as double),
-                title: "${s['percent']}%",
-                titleStyle: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                radius: 55,
-              )).toList(),
-            ),
-          ),
+          child: PieChart(PieChartData(
+            sectionsSpace: 2,
+            centerSpaceRadius: 0,
+            sections: _pieData
+                .map((s) => PieChartSectionData(
+                      color: s['color'] as Color,
+                      value: s['value'] as double,
+                      title: '${s['percent']}%',
+                      titleStyle: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white),
+                      radius: 55,
+                    ))
+                .toList(),
+          )),
         ),
       ],
     );
   }
 
-  Widget _buildHomeTab() {
-    if (isLoading) {
-      return const Center(child: CircularProgressIndicator(color: primaryGreen));
+  Widget _homeTab() {
+    if (_isLoading) {
+      return const Center(
+          child: CircularProgressIndicator(color: primaryGreen));
     }
 
-    final firstName = name.split(' ').first;
+    final firstName = _name.split(' ').first;
 
     return RefreshIndicator(
       color: primaryGreen,
-      onRefresh: _loadData,
+      onRefresh: _loadAll,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -199,26 +312,30 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Olá $firstName!",
-                      style: const TextStyle(color: primaryGreen, fontSize: 22, fontWeight: FontWeight.bold),
-                    ),
-                    const Text(
-                      "Bem-Vindo de volta!",
-                      style: TextStyle(color: primaryGreen, fontSize: 18, fontWeight: FontWeight.w500),
-                    ),
-                  ],
-                ),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Olá $firstName!',
+                          style: const TextStyle(
+                              color: primaryGreen,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold)),
+                      const Text('Bem-Vindo de volta!',
+                          style: TextStyle(
+                              color: primaryGreen,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500)),
+                    ]),
                 GestureDetector(
-                  onTap: _logout,
+                  onTap: _showProfileModal,
                   child: CircleAvatar(
                     radius: 22,
                     backgroundColor: primaryGreen,
                     child: Text(
-                      firstName.isNotEmpty ? firstName[0].toUpperCase() : "U",
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                      firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18),
                     ),
                   ),
                 ),
@@ -227,138 +344,128 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 20),
 
-            // Card Saldo
+            // Saldo
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               decoration: BoxDecoration(
-                color: primaryGreen,
-                borderRadius: BorderRadius.circular(16),
-              ),
+                  color: primaryGreen,
+                  borderRadius: BorderRadius.circular(16)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Saldo Atual", style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
+                  const Text('Saldo Atual',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500)),
                   const SizedBox(height: 6),
-                  Text(
-                    _formatCurrency(saldo),
-                    style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold),
-                  ),
+                  Text(_fmt(_balance),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 30,
+                          fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // Entradas / Saídas
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(16)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: const [
-                          Icon(Icons.arrow_upward, color: primaryGreen, size: 18),
-                          SizedBox(width: 4),
-                          Text("Entradas", style: TextStyle(color: Colors.white70, fontSize: 13)),
-                        ]),
-                        const SizedBox(height: 6),
-                        Text(_formatCurrency(entradas),
-                            style: const TextStyle(color: primaryGreen, fontSize: 16, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
+            Row(children: [
+              Expanded(
+                child: _infoCard(
+                  icon: Icons.arrow_upward,
+                  iconColor: primaryGreen,
+                  label: 'Entradas',
+                  value: _fmt(_income),
+                  valueColor: primaryGreen,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(16)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: const [
-                          Icon(Icons.arrow_downward, color: Colors.red, size: 18),
-                          SizedBox(width: 4),
-                          Text("Saídas", style: TextStyle(color: Colors.white70, fontSize: 13)),
-                        ]),
-                        const SizedBox(height: 6),
-                        Text(_formatCurrency(saidas),
-                            style: const TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _infoCard(
+                  icon: Icons.arrow_downward,
+                  iconColor: Colors.red,
+                  label: 'Saídas',
+                  value: _fmt(_expense),
+                  valueColor: Colors.red,
                 ),
-              ],
-            ),
+              ),
+            ]),
 
             const SizedBox(height: 16),
 
-            // Gráfico Pizza
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(16)),
+              decoration: BoxDecoration(
+                  color: cardBg, borderRadius: BorderRadius.circular(16)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildPieChart(),
+                  _buildPie(),
                   const SizedBox(height: 10),
-                  const Text("Gastos do Mês",
-                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                  const Text('Gastos do Mês',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // Últimas Movimentações
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(16)),
+              decoration: BoxDecoration(
+                  color: cardBg, borderRadius: BorderRadius.circular(16)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Últimas Movimentações",
-                      style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                  const Text('Últimas Movimentações',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600)),
                   const SizedBox(height: 12),
-                  if (ultimasMovimentacoes.isEmpty)
+                  if (_recent.isEmpty)
                     const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(12),
-                        child: Text("Nenhuma movimentação ainda", style: TextStyle(color: Colors.white54)),
-                      ),
-                    )
+                        child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text('Nenhuma movimentação ainda',
+                          style: TextStyle(color: Colors.white54)),
+                    ))
                   else
-                    ...ultimasMovimentacoes.map((t) {
+                    ..._recent.map((t) {
                       final isIncome = t['type'] == 'INCOME';
-                      final valor = (t['value'] as num).toDouble();
+                      final valor = (t['amount'] as num).toDouble();
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(
-                          children: [
-                            Icon(_categoryIcon(t['category']), color: Colors.white54, size: 22),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                t['description'] ?? t['category'] ?? "Transação",
-                                style: const TextStyle(color: Colors.white, fontSize: 14),
-                              ),
+                        child: Row(children: [
+                          Icon(_icon(t['category']),
+                              color: Colors.white54, size: 22),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              t['description'] ??
+                                  t['category'] ??
+                                  'Transação',
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 14),
                             ),
-                            Text(
-                              "${isIncome ? '+' : '-'}${_formatCurrency(valor)}",
-                              style: TextStyle(
-                                color: isIncome ? primaryGreen : Colors.red,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
+                          ),
+                          Text(
+                            '${isIncome ? '+' : '-'}${_fmt(valor)}',
+                            style: TextStyle(
+                              color: isIncome ? primaryGreen : Colors.red,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
                             ),
-                          ],
-                        ),
+                          ),
+                        ]),
                       );
-                    }).toList(),
+                    }),
                 ],
               ),
             ),
@@ -370,27 +477,61 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _infoCard({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required Color valueColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+          color: cardBg, borderRadius: BorderRadius.circular(16)),
+      child:
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(icon, color: iconColor, size: 18),
+          const SizedBox(width: 4),
+          Text(label,
+              style:
+                  const TextStyle(color: Colors.white70, fontSize: 13)),
+        ]),
+        const SizedBox(height: 6),
+        Text(value,
+            style: TextStyle(
+                color: valueColor,
+                fontSize: 16,
+                fontWeight: FontWeight.bold)),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tabs = [
-      _buildHomeTab(),
+      _homeTab(),
       const AddExpenseScreen(),
-      const DashboardScreen(),
+      const DashboardScreen()
     ];
-
     return Scaffold(
       backgroundColor: darkBg,
       body: SafeArea(child: tabs[_currentIndex]),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: cardBg,
         selectedItemColor: primaryGreen,
         unselectedItemColor: Colors.white38,
         currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
+        onTap: (i) {
+          setState(() => _currentIndex = i);
+          if (i == 0) _loadAll();
+        },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.add), label: "Adicionar"),
-          BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: "Dashboard"),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.add), label: 'Adicionar'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.show_chart), label: 'Dashboard'),
         ],
       ),
     );

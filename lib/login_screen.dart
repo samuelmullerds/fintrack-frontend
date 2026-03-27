@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'services/auth_service.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -60,7 +61,6 @@ class _LoginScreenState extends State<LoginScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           children: [
-            // Logo
             Expanded(
               flex: 3,
               child: Align(
@@ -76,7 +76,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
 
-            // Título
             Expanded(
               flex: 2,
               child: Center(
@@ -91,7 +90,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
 
-            // Campos e botões
             Expanded(
               flex: 5,
               child: Column(
@@ -117,7 +115,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 20),
 
-                  // Senha
                   TextField(
                     controller: passwordController,
                     obscureText: true,
@@ -137,7 +134,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 25),
 
-                  // Botão Entrar
                   SizedBox(
                     width: double.infinity,
                     height: 55,
@@ -164,9 +160,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 15),
 
-                  // Esqueceu senha
                   InkWell(
-                    onTap: () {},
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ForgotPasswordScreen()),
+                    ),
                     child: const Text(
                       "Esqueceu sua senha?",
                       style: TextStyle(
@@ -178,7 +177,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 15),
 
-                  // Link cadastro
                   Text("Não possui conta?", style: TextStyle(color: Colors.green[300])),
                   InkWell(
                     onTap: () {

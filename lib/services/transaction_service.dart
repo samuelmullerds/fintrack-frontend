@@ -3,104 +3,164 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TransactionService {
-  // ⚠️ Emulador Android → use http://10.0.2.2:8081
-  // ⚠️ Dispositivo físico → use o IP da sua máquina
-  // ⚠️ Web/Chrome → localhost funciona normalmente
-  final String baseUrl = "http://localhost:8081/transactions";
+  static const String baseUrl = "http://localhost:8081/transactions";
 
-  Future<String?> _getToken() async {
+  Future<String?> _token() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('token');
   }
 
   Map<String, String> _headers(String token) => {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer $token",
-  };
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      };
 
-  /// Busca todas as transações do usuário logado
-  Future<List<Map<String, dynamic>>> getTransactions() async {
-    final token = await _getToken();
+
+  Future<List<Map<String, dynamic>>> getTransactions({int page = 0, int size = 100}) async {
+    final token = await _token();
     if (token == null) return [];
 
     try {
-      final response = await http.get(
-        Uri.parse(baseUrl),
+      final res = await http.get(
+        Uri.parse("$baseUrl?page=$page&size=$size&sort=date,desc"),
         headers: _headers(token),
       );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.cast<Map<String, dynamic>>();
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        // Resposta paginada: { content: [...], ... }
+        final List<dynamic> content = body['content'] ?? [];
+        return content.cast<Map<String, dynamic>>();
       }
+      print("getTransactions error [${res.statusCode}]: ${res.body}");
     } catch (e) {
-      print("Erro ao buscar transações: $e");
+      print("getTransactions exception: $e");
     }
     return [];
   }
 
-  /// Adiciona uma nova transação — envia date no formato yyyy-MM-dd
-  Future<bool> addTransaction({
-    required double value,
-    required String category,
-    required String paymentMethod,
-    required String type,
-    String? date,         // yyyy-MM-dd  (ex: "2026-03-26")
-    String? description,
-  }) async {
-    final token = await _getToken();
-    if (token == null) return false;
-
-    // Usa a data informada ou hoje como fallback
-    final today = DateTime.now();
-    final fallback =
-        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-
-    final body = <String, dynamic>{
-      "value": value,
-      "category": category,
-      "paymentMethod": paymentMethod,
-      "type": type,
-      "date": date ?? fallback,
-    };
-
-    if (description != null && description.isNotEmpty) {
-      body["description"] = description;
-    }
+  Future<Map<String, dynamic>?> getDashboard() async {
+    final token = await _token();
+    if (token == null) return null;
 
     try {
-      final response = await http.post(
-        Uri.parse(baseUrl),
+      final res = await http.get(
+        Uri.parse("$baseUrl/dashboard"),
         headers: _headers(token),
-        body: jsonEncode(body),
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return true;
-      } else {
-        // Imprime o body do erro para facilitar depuração
-        print("Erro ao adicionar transação [${response.statusCode}]: ${response.body}");
-        return false;
-      }
+      if (res.statusCode == 200) return jsonDecode(res.body);
+      print("getDashboard error [${res.statusCode}]: ${res.body}");
     } catch (e) {
-      print("Exceção ao adicionar transação: $e");
+      print("getDashboard exception: $e");
+    }
+    return null;
+  }
+
+  Future<List<Map<String, dynamic>>> getCategorySummary() async {
+    final token = await _token();
+    if (token == null) return [];
+
+    try {
+      final res = await http.get(
+        Uri.parse("$baseUrl/category-summary"),
+        headers: _headers(token),
+      );
+
+      if (res.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(res.body);
+        return data.cast<Map<String, dynamic>>();
+      }
+      print("getCategorySummary error [${res.statusCode}]: ${res.body}");
+    } catch (e) {
+      print("getCategorySummary exception: $e");
+    }
+    return [];
+  }
+
+  Future<bool> addTransaction({
+    required double amount,
+    required String description,
+    required String category,
+    required String type,          
+    required String date,          
+  }) async {
+    final token = await _token();
+    if (token == null) return false;
+
+    final body = jsonEncode({
+      "description": description,
+      "amount": amount,
+      "category": category,
+      "type": type,
+      "date": date,
+    });
+
+    try {
+      final res = await http.post(
+        Uri.parse(baseUrl),
+        headers: _headers(token),
+        body: body,
+      );
+
+      if (res.statusCode == 200 || res.statusCode == 201) return true;
+      print("addTransaction error [${res.statusCode}]: ${res.body}");
+      return false;
+    } catch (e) {
+      print("addTransaction exception: $e");
       return false;
     }
   }
 
-  /// Deleta uma transação por ID
-  Future<bool> deleteTransaction(String id) async {
-    final token = await _getToken();
+  Future<bool> updateTransaction({
+    required int id,
+    required double amount,
+    required String description,
+    required String category,
+    required String type,
+    required String date,
+  }) async {
+    final token = await _token();
+    if (token == null) return false;
+
+    final body = jsonEncode({
+      "description": description,
+      "amount": amount,
+      "category": category,
+      "type": type,
+      "date": date,
+    });
+
+    try {
+      final res = await http.put(
+        Uri.parse("$baseUrl/$id"),
+        headers: _headers(token),
+        body: body,
+      );
+
+      if (res.statusCode == 200) return true;
+      print("updateTransaction error [${res.statusCode}]: ${res.body}");
+      return false;
+    } catch (e) {
+      print("updateTransaction exception: $e");
+      return false;
+    }
+  }
+
+  Future<bool> deleteTransaction(int id) async {
+    final token = await _token();
     if (token == null) return false;
 
     try {
-      final response = await http.delete(
+      final res = await http.delete(
         Uri.parse("$baseUrl/$id"),
         headers: _headers(token),
       );
-      return response.statusCode == 200 || response.statusCode == 204;
+      if (res.statusCode == 200 || res.statusCode == 204) return true;
+      print("deleteTransaction error [${res.statusCode}]: ${res.body}");
+      return false;
     } catch (e) {
-      print("Erro ao deletar transação: $e");
+      print("deleteTransaction exception: $e");
       return false;
     }
   }

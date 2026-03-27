@@ -3,64 +3,62 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  final String baseUrl = "http://localhost:8081/auth";
+  static const String baseUrl = "http://localhost:8081/auth";
 
   Future<Map<String, dynamic>?> login(String email, String password) async {
-    final url = Uri.parse("$baseUrl/login");
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/login"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email, "password": password}),
+      );
 
-    final response = await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"email": email, "password": password}),
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else if (response.statusCode == 401 || response.statusCode == 404) {
-      return null;
-    } else {
-      throw Exception("Erro no servidor");
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      if (response.statusCode == 401 || response.statusCode == 404) return null;
+      throw Exception("Erro no servidor [${response.statusCode}]");
+    } catch (e) {
+      rethrow;
     }
   }
 
-  Future<Map<String, dynamic>?> register(String name, String email, String password) async {
-    final url = Uri.parse("$baseUrl/register");
+  Future<Map<String, dynamic>?> register(
+      String name, String email, String password) async {
+    try {
+      final res = await http.post(
+        Uri.parse("$baseUrl/register"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"name": name, "email": email, "password": password}),
+      );
 
-    final response = await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"name": name, "email": email, "password": password}),
-    );
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return jsonDecode(response.body);
-    } else if (response.statusCode == 409) {
-      return null; // Email já cadastrado
-    } else {
-      throw Exception("Erro no servidor");
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        return await login(email, password);
+      }
+      if (res.statusCode == 409) return null; // e-mail já cadastrado
+      throw Exception("Erro ao registrar [${res.statusCode}]: ${res.body}");
+    } catch (e) {
+      rethrow;
     }
   }
 
   Future<Map<String, dynamic>?> getUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
+    final token = await _token();
     if (token == null) return null;
-
-    final url = Uri.parse("$baseUrl/me");
-
-    final response = await http.get(
-      url,
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $token",
-      },
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      print("Erro ao buscar usuário");
+    try {
+      final res = await http.get(
+        Uri.parse("$baseUrl/me"),
+        headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"},
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body);
+      print("getUser error [${res.statusCode}]");
+      return null;
+    } catch (e) {
+      print("getUser exception: $e");
       return null;
     }
+  }
+
+  Future<String?> _token() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('token');
   }
 }
