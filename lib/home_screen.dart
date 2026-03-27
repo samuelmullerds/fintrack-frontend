@@ -32,16 +32,16 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _pieData = [];
 
   static const _catColors = [
-    Color(0xFF1DB954), // verde spotify
-    Color(0xFF2196F3), // azul
-    Color(0xFFFF5722), // laranja-vermelho
-    Color(0xFFFFEB3B), // amarelo
-    Color(0xFFE91E63), // rosa
-    Color(0xFF9C27B0), // roxo
-    Color(0xFF00BCD4), // ciano
-    Color(0xFFFF9800), // laranja
-    Color(0xFF8BC34A), // verde-limão
-    Color(0xFF795548), // marrom
+    Color(0xFF1DB954),
+    Color(0xFF2196F3),
+    Color(0xFFFF5722),
+    Color(0xFFFFEB3B),
+    Color(0xFFE91E63),
+    Color(0xFF9C27B0),
+    Color(0xFF00BCD4),
+    Color(0xFFFF9800),
+    Color(0xFF8BC34A),
+    Color(0xFF795548),
   ];
 
   @override
@@ -59,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final results = await Future.wait([
       auth.getUser(),
       ts.getDashboard(),
-      ts.getTransactions(size: 4),
+      ts.getTransactions(size: 10),
       ts.getCategorySummary(),
     ]);
 
@@ -76,14 +76,13 @@ class _HomeScreenState extends State<HomeScreen> {
           'percent': totalCat > 0
               ? ((e.value['total'] as num).toDouble() / totalCat * 100).round()
               : 0,
-          // Garante cor única por índice com paleta de 10 cores
           'color': _catColors[e.key % _catColors.length],
         }).toList();
 
     if (!mounted) return;
     setState(() {
-      _name = user?['name'] ?? '';
-      _email = user?['email'] ?? '';
+      _name = (user?['name'] ?? user?['username'] ?? '').toString().trim();
+      _email = (user?['email'] ?? '').toString().trim();
       _balance = (dashboard?['balance'] as num?)?.toDouble() ?? 0;
       _income = (dashboard?['income'] as num?)?.toDouble() ?? 0;
       _expense = (dashboard?['expense'] as num?)?.toDouble() ?? 0;
@@ -101,8 +100,20 @@ class _HomeScreenState extends State<HomeScreen> {
         context, MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
+  void _openEdit(Map<String, dynamic> transaction) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddExpenseScreen(
+          transaction: transaction,
+          onSuccess: _loadAll,
+        ),
+      ),
+    );
+  }
+
   void _showProfileModal() {
-    final firstName = _name.split(' ').first;
+    final firstName = _name.isNotEmpty ? _name.trim().split(RegExp(r'\s+')).first : 'U';
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -117,14 +128,12 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
-              height: 4,
+              width: 40, height: 4,
               decoration: BoxDecoration(
                   color: Colors.white24,
                   borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 24),
-
             CircleAvatar(
               radius: 36,
               backgroundColor: primaryGreen,
@@ -137,25 +146,17 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
-            Text(
-              _name,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold),
-            ),
+            Text(_name,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-
-            Text(
-              _email,
-              style: const TextStyle(color: Colors.white54, fontSize: 14),
-            ),
+            Text(_email,
+                style: const TextStyle(color: Colors.white54, fontSize: 14)),
             const SizedBox(height: 24),
-
             const Divider(color: Colors.white12),
             const SizedBox(height: 8),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -164,11 +165,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 _profileStat('Saídas', _fmt(_expense), Colors.red),
               ],
             ),
-
             const SizedBox(height: 20),
             const Divider(color: Colors.white12),
             const SizedBox(height: 8),
-
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text('Sair da conta',
@@ -186,18 +185,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _profileStat(String label, String value, Color valueColor) {
-    return Column(
-      children: [
-        Text(value,
-            style: TextStyle(
-                color: valueColor,
-                fontSize: 14,
-                fontWeight: FontWeight.bold)),
-        const SizedBox(height: 2),
-        Text(label,
-            style: const TextStyle(color: Colors.white54, fontSize: 12)),
-      ],
-    );
+    return Column(children: [
+      Text(value,
+          style: TextStyle(
+              color: valueColor, fontSize: 14, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 2),
+      Text(label,
+          style: const TextStyle(color: Colors.white54, fontSize: 12)),
+    ]);
   }
 
   String _fmt(double v) {
@@ -205,25 +200,22 @@ class _HomeScreenState extends State<HomeScreen> {
     final parts = s.split(',');
     final intPart = parts[0].replaceAllMapped(
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
-    return 'R\$ $intPart,${parts[1]}';
+    final prefix = v < 0 ? '-R\$ ' : 'R\$ ';
+    return '$prefix$intPart,${parts[1]}';
   }
 
   IconData _icon(String? cat) {
     switch ((cat ?? '').toLowerCase()) {
-      case 'alimentação':
-        return Icons.shopping_cart_outlined;
-      case 'transporte':
-        return Icons.directions_car_outlined;
-      case 'contas fixas':
-        return Icons.wifi;
-      case 'lazer':
-        return Icons.sports_esports_outlined;
-      case 'saúde':
-        return Icons.favorite_outline;
-      case 'educação':
-        return Icons.school_outlined;
-      default:
-        return Icons.attach_money;
+      case 'alimentação': return Icons.shopping_cart_outlined;
+      case 'transporte': return Icons.directions_car_outlined;
+      case 'contas fixas': return Icons.wifi;
+      case 'lazer': return Icons.sports_esports_outlined;
+      case 'saúde': return Icons.favorite_outline;
+      case 'educação': return Icons.school_outlined;
+      case 'salário': return Icons.account_balance_wallet_outlined;
+      case 'freelance': return Icons.work_outline;
+      case 'investimentos': return Icons.trending_up;
+      default: return Icons.attach_money;
     }
   }
 
@@ -237,57 +229,53 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: _pieData
-                .map((s) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
-                      child: Row(children: [
-                        Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                                color: s['color'] as Color,
-                                shape: BoxShape.circle)),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            '${s['label']} ${s['percent']}%',
-                            style: const TextStyle(
-                                color: Colors.white70, fontSize: 11),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+    return Row(children: [
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: _pieData
+              .map((s) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(children: [
+                      Container(
+                          width: 10, height: 10,
+                          decoration: BoxDecoration(
+                              color: s['color'] as Color,
+                              shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '${s['label']} ${s['percent']}%',
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 11),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ]),
-                    ))
-                .toList(),
-          ),
+                      ),
+                    ]),
+                  ))
+              .toList(),
         ),
-        SizedBox(
-          width: 110,
-          height: 110,
-          child: PieChart(PieChartData(
-            sectionsSpace: 2,
-            centerSpaceRadius: 0,
-            sections: _pieData
-                .map((s) => PieChartSectionData(
-                      color: s['color'] as Color,
-                      value: s['value'] as double,
-                      title: '${s['percent']}%',
-                      titleStyle: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
-                      radius: 55,
-                    ))
-                .toList(),
-          )),
-        ),
-      ],
-    );
+      ),
+      SizedBox(
+        width: 110, height: 110,
+        child: PieChart(PieChartData(
+          sectionsSpace: 2,
+          centerSpaceRadius: 0,
+          sections: _pieData
+              .map((s) => PieChartSectionData(
+                    color: s['color'] as Color,
+                    value: s['value'] as double,
+                    title: '${s['percent']}%',
+                    titleStyle: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
+                    radius: 55,
+                  ))
+              .toList(),
+        )),
+      ),
+    ]);
   }
 
   Widget _homeTab() {
@@ -296,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: CircularProgressIndicator(color: primaryGreen));
     }
 
-    final firstName = _name.split(' ').first;
+    final firstName = _name.isNotEmpty ? _name.trim().split(RegExp(r'\s+')).first : '';
 
     return RefreshIndicator(
       color: primaryGreen,
@@ -307,24 +295,21 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Olá $firstName!',
-                          style: const TextStyle(
-                              color: primaryGreen,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold)),
-                      const Text('Bem-Vindo de volta!',
-                          style: TextStyle(
-                              color: primaryGreen,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500)),
-                    ]),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Olá $firstName!',
+                      style: const TextStyle(
+                          color: primaryGreen,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold)),
+                  const Text('Bem-Vindo de volta!',
+                      style: TextStyle(
+                          color: primaryGreen,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500)),
+                ]),
                 GestureDetector(
                   onTap: _showProfileModal,
                   child: CircleAvatar(
@@ -344,11 +329,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 20),
 
-            // Saldo
             Container(
               width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               decoration: BoxDecoration(
                   color: primaryGreen,
                   borderRadius: BorderRadius.circular(16)),
@@ -423,11 +406,19 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Últimas Movimentações',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Últimas Movimentações',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600)),
+                      const Text('toque para editar',
+                          style: TextStyle(
+                              color: Colors.white24, fontSize: 11)),
+                    ],
+                  ),
                   const SizedBox(height: 12),
                   if (_recent.isEmpty)
                     const Center(
@@ -440,30 +431,64 @@ class _HomeScreenState extends State<HomeScreen> {
                     ..._recent.map((t) {
                       final isIncome = t['type'] == 'INCOME';
                       final valor = (t['amount'] as num).toDouble();
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(children: [
-                          Icon(_icon(t['category']),
-                              color: Colors.white54, size: 22),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              t['description'] ??
-                                  t['category'] ??
-                                  'Transação',
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 14),
+                      return InkWell(
+                        onTap: () => _openEdit(t),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(children: [
+                            Container(
+                              width: 38, height: 38,
+                              decoration: BoxDecoration(
+                                color: (isIncome ? primaryGreen : Colors.red)
+                                    .withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(_icon(t['category']),
+                                  color:
+                                      isIncome ? primaryGreen : Colors.red,
+                                  size: 20),
                             ),
-                          ),
-                          Text(
-                            '${isIncome ? '+' : '-'}${_fmt(valor)}',
-                            style: TextStyle(
-                              color: isIncome ? primaryGreen : Colors.red,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    t['description'] ??
+                                        t['category'] ??
+                                        'Transação',
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 14),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(t['category'] ?? '',
+                                      style: const TextStyle(
+                                          color: Colors.white38,
+                                          fontSize: 12)),
+                                ],
+                              ),
                             ),
-                          ),
-                        ]),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '${isIncome ? '+' : '-'}${_fmt(valor)}',
+                                  style: TextStyle(
+                                    color: isIncome
+                                        ? primaryGreen
+                                        : Colors.red,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const Icon(Icons.edit_outlined,
+                                    color: Colors.white24, size: 13),
+                              ],
+                            ),
+                          ]),
+                        ),
                       );
                     }),
                 ],
@@ -488,14 +513,12 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
           color: cardBg, borderRadius: BorderRadius.circular(16)),
-      child:
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Icon(icon, color: iconColor, size: 18),
           const SizedBox(width: 4),
           Text(label,
-              style:
-                  const TextStyle(color: Colors.white70, fontSize: 13)),
+              style: const TextStyle(color: Colors.white70, fontSize: 13)),
         ]),
         const SizedBox(height: 6),
         Text(value,
@@ -511,8 +534,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final tabs = [
       _homeTab(),
-      const AddExpenseScreen(),
-      const DashboardScreen()
+      AddExpenseScreen(onSuccess: _loadAll),
+      const DashboardScreen(),
     ];
     return Scaffold(
       backgroundColor: darkBg,
@@ -529,7 +552,7 @@ class _HomeScreenState extends State<HomeScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.add), label: 'Adicionar'),
+              icon: Icon(Icons.add_circle_outline), label: 'Adicionar'),
           BottomNavigationBarItem(
               icon: Icon(Icons.show_chart), label: 'Dashboard'),
         ],
